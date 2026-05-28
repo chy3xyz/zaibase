@@ -166,7 +166,6 @@ logger.err("message", &.{});
 
 // With trace context
 logger.setTraceContextProvider(provider);
-// → provider is a TraceContextProvider with .get_fn callback
 ```
 
 ### SubsystemLogger
@@ -187,7 +186,7 @@ sub.logKind(.err, .request, "TRACE_REQUEST", &.{});
 Writes to stderr with pretty or compact formatting.
 
 ```zig
-const sink = Console.init(.info, .pretty);  // or .compact
+const sink = Console.init(.info, .pretty);
 const ls = sink.asLogSink();
 ```
 
@@ -198,12 +197,9 @@ Ring-buffer sink for testing. Stores up to N records.
 ```zig
 var sink = Memory.init(allocator, 64);
 const ls = sink.asLogSink();
-// ...
-const r = sink.latest();  // get most recent
-const all = sink.drain(); // get all records
+const r = sink.latest();
+const all = sink.drain();
 ```
-
-**Note:** Fields slices point into stack memory from the log call site. `latest()` and `drain()` return records by value. For testing fields, store data in heap-allocated variables.
 
 ### JsonlFile
 
@@ -238,15 +234,13 @@ const ls = sink.asLogSink();
 
 ### Multi
 
-Fan-out to multiple sinks.
+Fan-out to multiple sinks. Owns a copy of the sink slice.
 
 ```zig
-const multi = Multi.init(&.{ sink1.asLogSink(), sink2.asLogSink() });
+const multi = try Multi.init(allocator, &.{ sink1.asLogSink(), sink2.asLogSink() });
 ```
 
 ## Observability Integration
-
-Zaibase's `observability` module (request_trace, method_trace, step_trace, summary_trace) uses the logging module as its output layer. Each trace type emits structured `LogRecord`s with a specific `LogRecordKind`:
 
 | Trace Type      | `LogRecordKind` | Sink Label          |
 |-----------------|-----------------|---------------------|
@@ -255,21 +249,170 @@ Zaibase's `observability` module (request_trace, method_trace, step_trace, summa
 | SummaryTrace    | `.summary`      | `TRACE_SUMMARY`     |
 | StepTrace       | `.step`         | `TRACE_STEP`        |
 
-These are consumed by `LogObserver` and `MetricsObserver` for lifecycle tracking and metrics collection.
-
 ## Sink Error Handling
 
-All sink write/flush errors are swallowed (via `catch {}` in production sinks). This is by design: logging must never block the main code path. Use `MemorySink` + periodic draining for remote log shipping from a side task.
+All sink write/flush errors are swallowed (via `catch {}` in production sinks). This is by design: logging must never block the main code path.
 
 ## Thread Safety
 
-The `Logger` and sink types are **not** internally synchronized. In a multithreaded application, each thread should either:
-
-- Own its own `Logger` instance with a thread-safe sink (e.g., a shared `LogSink` that locks internally), or
-- Use a dedicated logging thread fed via a channel.
-
-The `LogSink` vtable dispatches to the implementation which may add its own synchronization (e.g., mutex around file writes).
+The `Logger` and sink types are **not** internally synchronized. In a multithreaded application, each thread should either own its own `Logger` or use a dedicated logging thread fed via a channel.
 
 ## Zig Version Compatibility
 
 Requires Zig 0.17.0+. The module uses `std.Io` APIs (Io.File, Io.Dir, Io.Timestamp) which were introduced in Zig 0.17. File sinks require an `std.Io` parameter for all I/O operations.
+
+---
+
+# Memory Module
+
+Agent memory store for persisting and recalling structured entries across sessions. Follows the same `{ ptr, vtable }` dispatch pattern as other zaibase modules.
+
+## Module Layout
+
+```
+src/memory/
+├── root.zig       # Module exports
+├── store.zig      # MemoryEntry, MemoryQuery, MemoryStore vtable
+└── episodic.zig   # EpisodicMemory (ring-buffer implementation)
+```
+
+## API Reference
+
+### MemoryEntry
+
+The unit of memory — a structured observation, decision, or fact.
+
+```zig
+const entry = zaibase.memory.MemoryEntry{
+    .id = "mem_01",          // Unique identifier
+    .key = "decision.retry", // Human-readable label
+    .value = "{\"strategy\":\"backoff\"}", // Structured value
+    .tags = &.{"retry", "http"},
+    .ts_unix_ms = 1000,      // Timestamp
+    .ttl_ms = 0,             // 0 = permanent
+};
+```
+
+### MemoryQuery
+
+Filter parameters for `recall()`:
+
+```zig
+const query = zaibase.memory.MemoryQuery{
+    .key = "decision.retry", // Exact key match
+    .tag = "http",           // Tag filter (any tag match)
+    .search = "retry",       // Substring in key or value
+    .limit = 32,             // Max results (newest-first)
+    .since_ms = 1000,        // Only entries at or after this timestamp
+};
+```
+
+### MemoryStore
+
+```zig
+pub fn store(self, entry: MemoryEntry) StoreError!void;
+pub fn recall(self, allocator, query: MemoryQuery) StoreError![]MemoryEntry;
+pub fn forget(self, id: []const u8) StoreError!void;
+pub fn count(self) usize;
+pub fn clear(self) void;
+```
+
+### EpisodicMemory
+
+Default in-memory ring-buffer implementation. Drops oldest entry when full.
+
+```zig
+var mem = zaibase.memory.EpisodicMemory.init(allocator, 1024);
+defer mem.deinit();
+var store = mem.asMemoryStore();
+try store.store(entry);
+```
+
+---
+
+# Evolution Module
+
+Self-evolution subsystem — records agent experiences and extracts insights for continuous improvement.
+
+## Module Layout
+
+```
+src/evolution/
+├── root.zig        # Module exports
+├── experience.zig  # Experience, ExperienceOutcome, NativeExperienceStore
+└── learner.zig     # Insight, SimpleLearner, Learner vtable
+```
+
+## API Reference
+
+### Experience
+
+Records a single agent action and its result.
+
+```zig
+const exp = zaibase.evolution.Experience{
+    .id = "exp_01",
+    .action = "tool.execute",         // What was done
+    .context_json = "{\"tool\":\"repo.health\"}",  // Structured context
+    .outcome = .success,              // success | failure | partial
+    .reward = 0.95,                   // Numeric feedback (0.0-1.0)
+    .detail = "completed in 1.2s",    // Optional result detail
+    .ts_unix_ms = 1000,
+    .tags = &.{"tool"},
+};
+```
+
+### ExperienceOutcome
+
+```zig
+pub const ExperienceOutcome = enum {
+    success,   // Positive result
+    failure,   // Negative result
+    partial,   // Partial or degraded result
+};
+```
+
+### NativeExperienceStore
+
+Ring-buffer experience log. Drops oldest when full.
+
+```zig
+var store = zaibase.evolution.NativeExperienceStore.init(allocator, 1024);
+defer store.deinit();
+try store.record(exp);
+const recent = try store.recent(allocator, 10);
+```
+
+### Insight
+
+A structured pattern derived from past experiences.
+
+```zig
+pub const Insight = struct {
+    title: []const u8,        // e.g. "tool.execute success rate"
+    sample_count: usize,      // How many experiences
+    success_rate: f64,        // 0.0 - 1.0
+    suggestion: []const u8,   // "continue using" | "review or replace" | "monitor"
+};
+```
+
+### SimpleLearner
+
+Produces insights by grouping experiences by action and computing success rates.
+
+```zig
+var learner = zaibase.evolution.SimpleLearner.init(allocator, &store);
+const insights = try learner.insights(10);  // Analyze last 10 experiences
+```
+
+### Learner VTable
+
+```zig
+pub const Learner = struct {
+    ptr: *anyopaque,
+    vtable: *const VTable,
+    pub const VTable = struct {
+        insights: *const fn (ptr, allocator, limit) anyerror![]Insight,
+    };
+};
+```
