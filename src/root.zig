@@ -15,6 +15,8 @@ pub const effects = @import("effects/root.zig");
 pub const tooling = @import("tooling/root.zig");
 pub const workflow = @import("workflow/root.zig");
 pub const agentkit = @import("agentkit/root.zig");
+pub const memory = @import("memory/root.zig");
+pub const evolution = @import("evolution/root.zig");
 pub const servicekit = @import("servicekit/root.zig");
 
 pub const AppError = core.error_model.AppError;
