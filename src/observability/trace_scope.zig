@@ -18,10 +18,10 @@ pub fn current() TraceContext {
 }
 
 pub fn provider() TraceContextProvider {
-    return .{ .ptr = undefined, .current = currentFromThreadLocal };
+    return .{ .ptr = undefined, .get_fn = currentFromThreadLocal };
 }
 
-fn currentFromThreadLocal(_: *anyopaque) TraceContext {
+fn currentFromThreadLocal(_: *anyopaque) ?TraceContext {
     return current_context;
 }
 

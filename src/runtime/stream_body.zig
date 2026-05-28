@@ -38,7 +38,7 @@ test "stream body contracts keep callback shapes" {
     _ = streaming;
 
     const websocket = WebSocketBody{
-        .accept_key = [_]u8{'a'} ** 28,
+        .accept_key = comptime blk: { var k: [28]u8 = undefined; @memset(&k, 'a'); break :blk k; },
         .ptr = undefined,
         .write = struct {
             fn call(_: *anyopaque, _: ByteSink) anyerror!void {}

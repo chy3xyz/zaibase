@@ -1,6 +1,6 @@
 const std = @import("std");
 const observer_model = @import("observer.zig");
-const logging = @import("zig-logging");
+const logging = @import("../core/logging/root.zig");
 
 pub const Observer = observer_model.Observer;
 pub const Logger = logging.Logger;
@@ -34,8 +34,8 @@ pub const LogObserver = struct {
         };
     }
 
-    pub fn record(self: *Self, topic: []const u8, payload_json: []const u8) anyerror!void {
-        while (!self.mutex.tryLock()) {}
+    pub fn record(self: *Self, topic: []const u8, payload_json: []const u8) void {
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         self.record_count += 1;
         self.mutex.unlock();
         self.logger.child(self.subsystem()).info("observer event", &.{
@@ -44,8 +44,8 @@ pub const LogObserver = struct {
         });
     }
 
-    pub fn flush(self: *Self) anyerror!void {
-        while (!self.mutex.tryLock()) {}
+    pub fn flush(self: *Self) void {
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         self.flush_count += 1;
         self.mutex.unlock();
         self.logger.flush();
@@ -61,19 +61,19 @@ pub const LogObserver = struct {
         self.subsystem_len = copy_len;
     }
 
-    fn recordErased(ptr: *anyopaque, topic: []const u8, payload_json: []const u8) anyerror!void {
+    fn recordErased(ptr: *anyopaque, topic: []const u8, payload_json: []const u8) void {
         const self: *Self = @ptrCast(@alignCast(ptr));
-        try self.record(topic, payload_json);
+        self.record(topic, payload_json);
     }
 
-    fn flushErased(ptr: *anyopaque) anyerror!void {
+    fn flushErased(ptr: *anyopaque) void {
         const self: *Self = @ptrCast(@alignCast(ptr));
-        try self.flush();
+        self.flush();
     }
 };
 
 test "log observer bridges observer events into logger" {
-    const memory_sink_model = @import("zig-logging");
+    const memory_sink_model = @import("../core/logging/root.zig");
 
     var sink = memory_sink_model.sinks.Memory.init(std.testing.allocator, 4);
     defer sink.deinit();
@@ -81,13 +81,11 @@ test "log observer bridges observer events into logger" {
     defer logger.deinit();
 
     var observer = LogObserver.init(&logger, "observer");
-    try observer.record("command.started", "{\"method\":\"app.meta\"}");
-    try observer.flush();
+    observer.record("command.started", "{\"method\":\"app.meta\"}");
+    observer.flush();
 
     try std.testing.expectEqual(@as(usize, 1), observer.record_count);
     try std.testing.expectEqual(@as(usize, 1), observer.flush_count);
     try std.testing.expectEqualStrings("observer", sink.latest().?.subsystem);
     try std.testing.expectEqualStrings("observer event", sink.latest().?.message);
 }
-
-

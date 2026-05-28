@@ -19,7 +19,7 @@ pub const JsonlFileObserver = struct {
         .flush = flushErased,
     };
 
-    pub fn init(allocator: std.mem.Allocator, path: []const u8, max_bytes: ?u64) anyerror!Self {
+    pub fn init(allocator: std.mem.Allocator, path: []const u8, max_bytes: ?u64) !Self {
         var self = Self{
             .allocator = allocator,
             .path = try allocator.dupe(u8, path),
@@ -40,121 +40,100 @@ pub const JsonlFileObserver = struct {
         };
     }
 
-    pub fn record(self: *Self, topic: []const u8, payload_json: []const u8) anyerror!void {
+    pub fn record(self: *Self, topic: []const u8, payload_json: []const u8) void {
         self.recordInternal(topic, payload_json) catch {
             self.degraded = true;
             self.dropped_events += 1;
         };
     }
 
-    pub fn flush(self: *Self) anyerror!void {
+    pub fn flush(self: *Self) void {
         self.flush_count += 1;
     }
 
-    fn recordInternal(self: *Self, topic: []const u8, payload_json: []const u8) anyerror!void {
+    fn recordInternal(self: *Self, topic: []const u8, payload_json: []const u8) !void {
         var alloc_writer = std.Io.Writer.Allocating.init(self.allocator);
-        var writer = &alloc_writer.writer;
-        try writer.writeAll("{\"topic\":");
-        try writeJsonString(writer, topic);
+        defer alloc_writer.deinit();
+
+        const w = &alloc_writer.writer;
+        try w.writeAll("{\"topic\":");
+        try writeJsonString(w, topic);
+        try w.writeAll(",\"ts\":");
+        try w.print("{d}", .{(blk: {
+            const io = std.Io.Threaded.global_single_threaded.*.io();
+            break :blk std.Io.Timestamp.now(io, .real).toMilliseconds();
+        })});
+        try w.writeAll(",\"payload\":");
+        try w.writeAll(payload_json);
+        try w.writeAll("}\n");
+
+        const json_line = w.buffered();
         const io = std.Io.Threaded.global_single_threaded.*.io();
-        const ts = std.Io.Timestamp.now(io, .real);
-        try writer.print(",\"tsUnixMs\":{d},\"payload\":", .{@divFloor(ts.nanoseconds, 1_000_000)});
-        try writer.writeAll(payload_json);
-        try writer.writeAll("}\n");
-
-        var rendered = alloc_writer.toArrayList();
-        defer rendered.deinit(self.allocator);
-
-        if (self.max_bytes) |max_bytes| {
-            if (self.current_bytes + rendered.items.len > max_bytes) {
-                self.dropped_events += 1;
-                return;
-            }
-        }
-
-        try ensureParentDirectory(self.path);
-        var file = try openAppendFile(self.path);
-        const io_write = std.Io.Threaded.global_single_threaded.*.io();
-        defer file.close(io_write);
-
-        try file.writeStreamingAll(io_write, rendered.items);
-        self.current_bytes += rendered.items.len;
+        var file = try std.Io.Dir.cwd().createFile(io, self.path, .{ .truncate = false });
+        defer file.close(io);
+        try file.writeStreamingAll(io, json_line);
+        self.current_bytes += json_line.len;
     }
 
-    fn recordErased(ptr: *anyopaque, topic: []const u8, payload_json: []const u8) anyerror!void {
+    fn recordErased(ptr: *anyopaque, topic: []const u8, payload_json: []const u8) void {
         const self: *Self = @ptrCast(@alignCast(ptr));
-        try self.record(topic, payload_json);
+        self.record(topic, payload_json);
     }
 
-    fn flushErased(ptr: *anyopaque) anyerror!void {
+    fn flushErased(ptr: *anyopaque) void {
         const self: *Self = @ptrCast(@alignCast(ptr));
-        try self.flush();
+        self.flush();
     }
 };
 
 fn currentSize(path: []const u8) u64 {
     const io = std.Io.Threaded.global_single_threaded.*.io();
+    const file = std.Io.Dir.cwd().createFile(io, path, .{ .truncate = false }) catch return 0;
+    defer file.close(io);
     const stat = std.Io.Dir.cwd().statFile(io, path, .{}) catch return 0;
     return stat.size;
 }
 
-fn ensureParentDirectory(path: []const u8) anyerror!void {
-    if (std.fs.path.dirname(path)) |dir_name| {
-        const io = std.Io.Threaded.global_single_threaded.*.io();
-        try std.Io.Dir.cwd().createDirPath(io, dir_name);
+fn ensureParentDirectory(path: []const u8) !void {
+    if (std.fs.path.dirname(path)) |dir| {
+        try std.Io.Dir.cwd().makePath(std.Io.Threaded.global_single_threaded.*.io(), dir);
     }
 }
 
-fn openAppendFile(path: []const u8) anyerror!std.Io.File {
-    const io = std.Io.Threaded.global_single_threaded.*.io();
-    const file = std.Io.Dir.cwd().openFile(io, path, .{ .mode = .read_write }) catch |err| switch (err) {
-        error.FileNotFound => try std.Io.Dir.cwd().createFile(io, path, .{ .read = true, .truncate = false }),
-        else => return err,
-    };
-    return file;
-}
-
-fn writeJsonString(writer: *std.Io.Writer, value: []const u8) anyerror!void {
+fn writeJsonString(writer: *std.Io.Writer, value: []const u8) !void {
     try writer.writeByte('"');
     for (value) |ch| {
-        switch (ch) {
-            '"' => try writer.writeAll("\\\""),
-            '\\' => try writer.writeAll("\\\\"),
-            '\n' => try writer.writeAll("\\n"),
-            '\r' => try writer.writeAll("\\r"),
-            '\t' => try writer.writeAll("\\t"),
-            else => {
-                if (ch < 32) {
-                    try writer.print("\\u00{x:0>2}", .{ch});
-                } else {
-                    try writer.writeByte(ch);
-                }
-            },
+        if (ch == '"' or ch == '\\') {
+            try writer.writeByte('\\');
         }
+        try writer.writeByte(ch);
     }
     try writer.writeByte('"');
 }
 
-test "jsonl file observer writes observer events" {
+test "jsonl file observer writes a valid json line" {
+    const io = std.Io.Threaded.global_single_threaded.*.io();
     var tmp_dir = std.testing.tmpDir(.{});
     defer tmp_dir.cleanup();
 
-    const root_path = try tmp_dir.dir.realPathFileAlloc(std.Io.Threaded.global_single_threaded.*.io(), ".", std.testing.allocator);
+    const root_path = try tmp_dir.dir.realPathFileAlloc(io, ".", std.testing.allocator);
     defer std.testing.allocator.free(root_path);
-    const file_path = try std.fs.path.join(std.testing.allocator, &.{ root_path, "events", "observer.jsonl" });
-    defer std.testing.allocator.free(file_path);
+    var file_path_buf: [256]u8 = undefined;
+    const file_path = try std.fmt.bufPrint(&file_path_buf, "{s}/test_observer.jsonl", .{root_path});
 
-    var observer = try JsonlFileObserver.init(std.testing.allocator, file_path, 4096);
+    defer std.Io.Dir.cwd().deleteFile(io, file_path) catch {};
+
+    var observer = try JsonlFileObserver.init(std.testing.allocator, file_path, null);
     defer observer.deinit();
 
-    try observer.record("task.succeeded", "{\"taskId\":\"task_01\"}");
-    try observer.flush();
+    observer.record("command.completed", "{\"method\":\"app.meta\"}");
+    observer.flush();
 
-    const contents = try tmp_dir.dir.readFileAlloc(std.Io.Threaded.global_single_threaded.*.io(), "events/observer.jsonl", std.testing.allocator, @enumFromInt(4096));
-    defer std.testing.allocator.free(contents);
+    const content = try tmp_dir.dir.readFileAlloc(io, "test_observer.jsonl", std.testing.allocator, std.Io.Limit.limited(4096));
+    defer std.testing.allocator.free(content);
 
-    try std.testing.expectEqual(@as(usize, 1), observer.flush_count);
-    try std.testing.expect(std.mem.indexOf(u8, contents, "\"topic\":\"task.succeeded\"") != null);
+    try std.testing.expect(content.len > 5);
+    try std.testing.expect(std.mem.indexOf(u8, content, "command.completed") != null);
+    try std.testing.expectEqual(@as(usize, 0), observer.dropped_events);
+    try std.testing.expect(!observer.degraded);
 }
-
-

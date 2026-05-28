@@ -5,13 +5,15 @@ pub const ObservedEvent = struct {
     ts_unix_ms: i64,
     payload_json: []u8,
 
-    pub fn clone(self: ObservedEvent, allocator: std.mem.Allocator) anyerror!ObservedEvent {
+    pub fn clone(self: ObservedEvent, allocator: std.mem.Allocator) (CloneError || error{OutOfMemory})!ObservedEvent {
         return .{
             .topic = try allocator.dupe(u8, self.topic),
             .ts_unix_ms = self.ts_unix_ms,
             .payload_json = try allocator.dupe(u8, self.payload_json),
         };
     }
+
+    pub const CloneError = std.mem.Allocator.Error;
 
     pub fn deinit(self: *ObservedEvent, allocator: std.mem.Allocator) void {
         allocator.free(self.topic);
@@ -24,16 +26,16 @@ pub const Observer = struct {
     vtable: *const VTable,
 
     pub const VTable = struct {
-        record: *const fn (ptr: *anyopaque, topic: []const u8, payload_json: []const u8) anyerror!void,
-        flush: *const fn (ptr: *anyopaque) anyerror!void,
+        record: *const fn (ptr: *anyopaque, topic: []const u8, payload_json: []const u8) void,
+        flush: *const fn (ptr: *anyopaque) void,
     };
 
-    pub fn record(self: Observer, topic: []const u8, payload_json: []const u8) anyerror!void {
-        return self.vtable.record(self.ptr, topic, payload_json);
+    pub fn record(self: Observer, topic: []const u8, payload_json: []const u8) void {
+        self.vtable.record(self.ptr, topic, payload_json);
     }
 
-    pub fn flush(self: Observer) anyerror!void {
-        return self.vtable.flush(self.ptr);
+    pub fn flush(self: Observer) void {
+        self.vtable.flush(self.ptr);
     }
 };
 
@@ -55,7 +57,7 @@ pub const MemoryObserver = struct {
     }
 
     pub fn deinit(self: *Self) void {
-        while (!self.mutex.tryLock()) {}
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         for (self.events.items) |*event| {
@@ -71,23 +73,26 @@ pub const MemoryObserver = struct {
         };
     }
 
-    pub fn record(self: *Self, topic: []const u8, payload_json: []const u8) anyerror!void {
-        while (!self.mutex.tryLock()) {}
+    pub fn record(self: *Self, topic: []const u8, payload_json: []const u8) void {
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
-        try self.events.append(self.allocator, .{
-            .topic = try self.allocator.dupe(u8, topic),
-            .ts_unix_ms = (blk: { const io = std.Io.Threaded.global_single_threaded.*.io(); break :blk std.Io.Timestamp.now(io, .real).toMilliseconds(); }),
-            .payload_json = try self.allocator.dupe(u8, payload_json),
-        });
+        self.events.append(self.allocator, .{
+            .topic = self.allocator.dupe(u8, topic) catch return,
+            .ts_unix_ms = (blk: {
+                const io = std.Io.Threaded.global_single_threaded.*.io();
+                break :blk std.Io.Timestamp.now(io, .real).toMilliseconds();
+            }),
+            .payload_json = self.allocator.dupe(u8, payload_json) catch return,
+        }) catch {};
     }
 
-    pub fn flush(self: *Self) anyerror!void {
+    pub fn flush(self: *Self) void {
         self.flush_count += 1;
     }
 
-    pub fn snapshot(self: *Self, allocator: std.mem.Allocator) anyerror![]ObservedEvent {
-        while (!self.mutex.tryLock()) {}
+    pub fn snapshot(self: *Self, allocator: std.mem.Allocator) ![]ObservedEvent {
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         const events = try allocator.alloc(ObservedEvent, self.events.items.len);
@@ -104,14 +109,14 @@ pub const MemoryObserver = struct {
         return self.events.items.len;
     }
 
-    fn recordErased(ptr: *anyopaque, topic: []const u8, payload_json: []const u8) anyerror!void {
+    fn recordErased(ptr: *anyopaque, topic: []const u8, payload_json: []const u8) void {
         const self: *Self = @ptrCast(@alignCast(ptr));
-        try self.record(topic, payload_json);
+        self.record(topic, payload_json);
     }
 
-    fn flushErased(ptr: *anyopaque) anyerror!void {
+    fn flushErased(ptr: *anyopaque) void {
         const self: *Self = @ptrCast(@alignCast(ptr));
-        try self.flush();
+        self.flush();
     }
 };
 
@@ -119,8 +124,8 @@ test "memory observer records and snapshots events" {
     var observer = MemoryObserver.init(std.testing.allocator);
     defer observer.deinit();
 
-    try observer.record("command.started", "{\"method\":\"app.meta\"}");
-    try observer.flush();
+    observer.record("command.started", "{\"method\":\"app.meta\"}");
+    observer.flush();
 
     const events = try observer.snapshot(std.testing.allocator);
     defer {
@@ -132,5 +137,3 @@ test "memory observer records and snapshots events" {
     try std.testing.expectEqual(@as(usize, 1), observer.flush_count);
     try std.testing.expectEqualStrings("command.started", events[0].topic);
 }
-
-

@@ -57,11 +57,11 @@ pub const MetricsObserver = struct {
         };
     }
 
-    pub fn record(self: *Self, topic: []const u8, payload_json: []const u8) anyerror!void {
+    pub fn record(self: *Self, topic: []const u8, payload_json: []const u8) void {
         return self.recordWithPayload(topic, payload_json);
     }
 
-    pub fn recordWithPayload(self: *Self, topic: []const u8, payload_json: []const u8) anyerror!void {
+    pub fn recordWithPayload(self: *Self, topic: []const u8, payload_json: []const u8) void {
         while (!self.mutex.tryLock()) {}
         defer self.mutex.unlock();
 
@@ -144,7 +144,7 @@ pub const MetricsObserver = struct {
         }
     }
 
-    pub fn flush(self: *Self) anyerror!void {
+    pub fn flush(self: *Self) void {
         while (!self.mutex.tryLock()) {}
         defer self.mutex.unlock();
         self.snapshot_data.flush_count += 1;
@@ -156,14 +156,14 @@ pub const MetricsObserver = struct {
         return self.snapshot_data;
     }
 
-    fn recordErased(ptr: *anyopaque, topic: []const u8, payload_json: []const u8) anyerror!void {
+    fn recordErased(ptr: *anyopaque, topic: []const u8, payload_json: []const u8) void {
         const self: *Self = @ptrCast(@alignCast(ptr));
-        try self.recordWithPayload(topic, payload_json);
+        self.recordWithPayload(topic, payload_json);
     }
 
-    fn flushErased(ptr: *anyopaque) anyerror!void {
+    fn flushErased(ptr: *anyopaque) void {
         const self: *Self = @ptrCast(@alignCast(ptr));
-        try self.flush();
+        self.flush();
     }
 };
 
@@ -190,13 +190,13 @@ fn extractBoolField(payload_json: []const u8, key: []const u8) ?bool {
 
 test "metrics observer tracks command and task counters" {
     var observer = MetricsObserver.init();
-    try observer.record("command.started", "{\"durationMs\":2}");
-    try observer.record("command.completed", "{\"durationMs\":5}");
-    try observer.record("task.queued", "{}");
-    try observer.record("task.running", "{}");
-    try observer.record("task.succeeded", "{\"durationMs\":11,\"result\":{}} ");
-    try observer.record("config.changed", "{\"changedCount\":3,\"requiresRestart\":true,\"sideEffectCount\":2,\"postWriteHookCount\":1}");
-    try observer.flush();
+    observer.record("command.started", "{\"durationMs\":2}");
+    observer.record("command.completed", "{\"durationMs\":5}");
+    observer.record("task.queued", "{}");
+    observer.record("task.running", "{}");
+    observer.record("task.succeeded", "{\"durationMs\":11,\"result\":{}} ");
+    observer.record("config.changed", "{\"changedCount\":3,\"requiresRestart\":true,\"sideEffectCount\":2,\"postWriteHookCount\":1}");
+    observer.flush();
 
     const snapshot = observer.snapshot();
     try std.testing.expectEqual(@as(usize, 6), snapshot.total_events);

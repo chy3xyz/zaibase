@@ -136,7 +136,7 @@ pub const TaskRunner = struct {
         }
         self.threads.deinit(self.allocator);
 
-        while (!self.mutex.tryLock()) {}
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         for (self.tasks.items) |*task| {
@@ -148,7 +148,7 @@ pub const TaskRunner = struct {
     pub fn submit(self: *Self, command: []const u8, request_id: ?[]const u8) anyerror!TaskAccepted {
         var accepted: TaskAccepted = undefined;
 
-        while (!self.mutex.tryLock()) {}
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         const task_id = try std.fmt.allocPrint(self.allocator, "task_{d:0>6}", .{self.next_id});
@@ -192,7 +192,7 @@ pub const TaskRunner = struct {
             return err;
         };
 
-        while (!self.mutex.tryLock()) {}
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
         try self.threads.append(self.allocator, thread);
         return accepted;
@@ -219,7 +219,7 @@ pub const TaskRunner = struct {
     pub fn cancel(self: *Self, id: []const u8) anyerror!void {
         var payload: []u8 = undefined;
 
-        while (!self.mutex.tryLock()) {}
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         const task = self.findMutableByIdLocked(id) orelse return error.TaskNotFound;
@@ -238,7 +238,7 @@ pub const TaskRunner = struct {
     }
 
     pub fn snapshotById(self: *Self, allocator: std.mem.Allocator, id: []const u8) anyerror!?TaskSummary {
-        while (!self.mutex.tryLock()) {}
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         const task = self.findByIdLocked(id) orelse return null;
@@ -246,7 +246,7 @@ pub const TaskRunner = struct {
     }
 
     pub fn snapshotByRequestId(self: *Self, allocator: std.mem.Allocator, request_id: []const u8) anyerror!?TaskSummary {
-        while (!self.mutex.tryLock()) {}
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         const task = self.findByRequestIdLocked(request_id) orelse return null;
@@ -254,7 +254,7 @@ pub const TaskRunner = struct {
     }
 
     pub fn countByState(self: *Self, state: TaskState) usize {
-        while (!self.mutex.tryLock()) {}
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         var total: usize = 0;
@@ -267,7 +267,7 @@ pub const TaskRunner = struct {
     }
 
     pub fn latest(self: *Self, allocator: std.mem.Allocator) anyerror!?TaskSummary {
-        while (!self.mutex.tryLock()) {}
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         if (self.tasks.items.len == 0) {
@@ -277,7 +277,7 @@ pub const TaskRunner = struct {
     }
 
     pub fn snapshot(self: *Self, allocator: std.mem.Allocator) anyerror![]TaskSummary {
-        while (!self.mutex.tryLock()) {}
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         const summaries = try allocator.alloc(TaskSummary, self.tasks.items.len);
@@ -309,7 +309,7 @@ pub const TaskRunner = struct {
     }
 
     pub fn count(self: *Self) usize {
-        while (!self.mutex.tryLock()) {}
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
         return self.tasks.items.len;
     }
@@ -317,7 +317,7 @@ pub const TaskRunner = struct {
     fn transitionToRunning(self: *Self, id: []const u8) anyerror!void {
         var payload: []u8 = undefined;
 
-        while (!self.mutex.tryLock()) {}
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         const task = self.findMutableByIdLocked(id) orelse return error.TaskNotFound;
@@ -334,7 +334,7 @@ pub const TaskRunner = struct {
     fn transitionToSucceeded(self: *Self, id: []const u8, result_json: ?[]u8) anyerror!void {
         var payload: []u8 = undefined;
 
-        while (!self.mutex.tryLock()) {}
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         const task = self.findMutableByIdLocked(id) orelse return error.TaskNotFound;
@@ -365,7 +365,7 @@ pub const TaskRunner = struct {
     fn transitionToFailed(self: *Self, id: []const u8, owned_error_code: ?[]u8) anyerror!void {
         var payload: []u8 = undefined;
 
-        while (!self.mutex.tryLock()) {}
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         const task = self.findMutableByIdLocked(id) orelse {
@@ -461,7 +461,7 @@ pub const TaskRunner = struct {
             _ = event_bus.publish(topic, payload_json) catch {};
         }
         if (self.observer) |observer| {
-            observer.record(topic, payload_json) catch {};
+            observer.record(topic, payload_json);
         }
     }
 

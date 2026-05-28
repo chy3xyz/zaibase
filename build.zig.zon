@@ -1,22 +1,16 @@
 .{
     .name = .framework,
-    .version = "0.2.0",
+    .version = "0.3.0",
     .fingerprint = 0x9d766e19da13de70,
-    .minimum_zig_version = "0.16.0",
-    .dependencies = .{
-        .@"zig-logging" = .{
-            .path = "../zig-logging",
-        },
-        .@"zig-release" = .{
-            .url = "https://github.com/topaihub/zig-release/archive/b4aaef15780d5c317b63f4fcff920c02190c836d.tar.gz",
-            .hash = "zig_release-0.1.0-nnPfHfQ5AACmR5zqN55Wikfu32Z0xGuVAySWNJtpQVeF",
-        },
-    },
+    .minimum_zig_version = "0.17.0",
+    .dependencies = .{},
     .paths = .{
         "README.md",
         "build.zig",
         "build.zig.zon",
         "src",
         "tests",
+        "examples",
+        "docs",
     },
 }

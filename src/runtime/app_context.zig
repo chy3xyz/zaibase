@@ -102,6 +102,7 @@ pub const AppContext = struct {
             errdefer allocator.destroy(instance);
             instance.* = try MultiSink.init(allocator, sinks.items);
             logger_multi_sink = instance;
+            // MultiSink owns a copy; safe to free the source.
         }
 
         const logger = try allocator.create(Logger);
@@ -189,7 +190,7 @@ pub const AppContext = struct {
     }
 
     pub fn deinit(self: *Self) void {
-        _ = self.multi_observer.flush() catch {};
+        self.multi_observer.flush();
         self.logger.flush();
 
         self.task_runner.deinit();
@@ -218,10 +219,10 @@ pub const AppContext = struct {
             self.allocator.destroy(file_observer);
         }
 
-        self.log_observer.flush() catch {};
+        self.log_observer.flush();
         self.allocator.destroy(self.log_observer);
 
-        self.metrics_observer.flush() catch {};
+        self.metrics_observer.flush();
         self.allocator.destroy(self.metrics_observer);
 
         self.memory_observer.deinit();

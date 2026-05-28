@@ -497,7 +497,7 @@ pub const CommandDispatcher = struct {
             _ = try event_bus.publish(topic, payload);
         }
         if (self.observer) |observer| {
-            try observer.record(topic, payload);
+            observer.record(topic, payload);
         }
     }
 
@@ -636,7 +636,7 @@ test "command dispatcher validates request params through shared validator" {
 }
 
 test "command dispatcher writes validation lifecycle logs" {
-    const memory_sink_model = @import("zig-logging");
+    const memory_sink_model = @import("../core/logging/root.zig");
 
     var memory_sink = memory_sink_model.sinks.Memory.init(std.testing.allocator, 8);
     defer memory_sink.deinit();

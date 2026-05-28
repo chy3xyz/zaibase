@@ -483,7 +483,7 @@ pub const ConfigWritePipeline = struct {
             _ = try event_bus.publish(topic, payload);
         }
         if (self.observer) |observer| {
-            try observer.record(topic, payload);
+            observer.record(topic, payload);
         }
     }
 };

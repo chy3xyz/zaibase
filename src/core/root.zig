@@ -2,7 +2,7 @@ const std = @import("std");
 
 pub const MODULE_NAME = "core";
 pub const error_model = @import("error.zig");
-pub const logging = @import("zig-logging");
+pub const logging = @import("logging/root.zig");
 pub const validation = @import("validation/root.zig");
 pub const security = @import("security/root.zig");
 

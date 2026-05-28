@@ -16,7 +16,7 @@ pub const MultiObserver = struct {
         .flush = flushErased,
     };
 
-    pub fn init(allocator: std.mem.Allocator, observers: []const Observer) anyerror!Self {
+    pub fn init(allocator: std.mem.Allocator, observers: []const Observer) !Self {
         return .{
             .allocator = allocator,
             .observers = try allocator.dupe(Observer, observers),
@@ -34,30 +34,26 @@ pub const MultiObserver = struct {
         };
     }
 
-    pub fn record(self: *Self, topic: []const u8, payload_json: []const u8) anyerror!void {
+    pub fn record(self: *Self, topic: []const u8, payload_json: []const u8) void {
         for (self.observers) |observer| {
-            observer.record(topic, payload_json) catch {
-                self.record_failures += 1;
-            };
+            observer.record(topic, payload_json);
         }
     }
 
-    pub fn flush(self: *Self) anyerror!void {
+    pub fn flush(self: *Self) void {
         for (self.observers) |observer| {
-            observer.flush() catch {
-                self.flush_failures += 1;
-            };
+            observer.flush();
         }
     }
 
-    fn recordErased(ptr: *anyopaque, topic: []const u8, payload_json: []const u8) anyerror!void {
+    fn recordErased(ptr: *anyopaque, topic: []const u8, payload_json: []const u8) void {
         const self: *Self = @ptrCast(@alignCast(ptr));
-        try self.record(topic, payload_json);
+        self.record(topic, payload_json);
     }
 
-    fn flushErased(ptr: *anyopaque) anyerror!void {
+    fn flushErased(ptr: *anyopaque) void {
         const self: *Self = @ptrCast(@alignCast(ptr));
-        try self.flush();
+        self.flush();
     }
 };
 
@@ -73,10 +69,8 @@ test "multi observer fans out events" {
     });
     defer multi.deinit();
 
-    try multi.record("command.completed", "{\"method\":\"app.meta\"}");
+    multi.record("command.completed", "{\"method\":\"app.meta\"}");
 
     try std.testing.expectEqual(@as(usize, 1), first.count());
     try std.testing.expectEqual(@as(usize, 1), second.count());
 }
-
-

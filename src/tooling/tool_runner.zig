@@ -440,11 +440,7 @@ test "tool runner emits events and logs for native tool execution" {
     try std.testing.expectEqualStrings("tool.started", events[0].topic);
     try std.testing.expectEqualStrings("tool.completed", events[1].topic);
 
-    const logs = try app_context.memory_sink.snapshot(std.testing.allocator);
-    defer {
-        for (logs) |*item| item.deinit(std.testing.allocator);
-        std.testing.allocator.free(logs);
-    }
+    const logs = app_context.memory_sink.snapshot();
     var saw_tool_log = false;
     for (logs) |entry| {
         if (std.mem.eql(u8, entry.message, "tool executing")) saw_tool_log = true;

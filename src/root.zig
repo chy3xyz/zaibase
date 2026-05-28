@@ -63,7 +63,8 @@ pub const MultiSink = core.logging.sinks.Multi;
 pub const RedactMode = core.logging.RedactMode;
 pub const RotatingFileSink = core.logging.sinks.RotatingFile;
 pub const RotatingFileSinkConfig = core.logging.RotatingFileSinkConfig;
-pub const LogFormat = core.logging.LogFormat;
+
+
 pub const Logger = core.logging.Logger;
 pub const LoggerOptions = core.logging.LoggerOptions;
 pub const TraceContext = core.logging.TraceContext;
