@@ -1,7 +1,7 @@
 .{
-    .name = .framework,
+    .name = .zaibase,
     .version = "0.3.0",
-    .fingerprint = 0x9d766e19da13de70,
+    .fingerprint = 0x630eb8a579acae20,
     .minimum_zig_version = "0.17.0",
     .dependencies = .{},
     .paths = .{

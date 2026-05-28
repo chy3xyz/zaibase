@@ -1,8 +1,8 @@
-//! framework — reusable Zig application framework scaffold.
+//! framework zaibase — Zig AI development application framework scaffold.
 
 const std = @import("std");
 
-pub const PACKAGE_NAME = "framework";
+pub const PACKAGE_NAME = "zaibase";
 pub const PACKAGE_VERSION = "0.1.0";
 
 pub const core = @import("core/root.zig");

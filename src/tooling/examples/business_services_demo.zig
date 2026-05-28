@@ -1,18 +1,18 @@
 const std = @import("std");
-const framework = @import("../../root.zig");
+const zaibase = @import("../../root.zig");
 
 pub const ExampleServices = struct {
-    framework_context: *framework.AppContext,
-    tooling_runtime: *framework.ToolingRuntime,
+    framework_context: *zaibase.AppContext,
+    tooling_runtime: *zaibase.ToolingRuntime,
     project_root: []const u8,
 
-    pub fn fromCommandContext(ctx: *const framework.CommandContext) *ExampleServices {
+    pub fn fromCommandContext(ctx: *const zaibase.CommandContext) *ExampleServices {
         return @ptrCast(@alignCast(ctx.user_data.?));
     }
 };
 
 const DescribeCommand = struct {
-    fn call(ctx: *const framework.CommandContext) anyerror![]u8 {
+    fn call(ctx: *const zaibase.CommandContext) anyerror![]u8 {
         const services = ExampleServices.fromCommandContext(ctx);
         return std.fmt.allocPrint(ctx.allocator, "{{\"project_root\":{f},\"tool_count\":{d}}}", .{
             std.json.fmt(services.project_root, .{}),
@@ -21,7 +21,7 @@ const DescribeCommand = struct {
     }
 };
 
-pub fn registerCommands(registry: *framework.CommandRegistry, services: *ExampleServices) !void {
+pub fn registerCommands(registry: *zaibase.CommandRegistry, services: *ExampleServices) !void {
     try registry.register(.{
         .id = "example.services.describe",
         .method = "example.services.describe",
@@ -32,17 +32,17 @@ pub fn registerCommands(registry: *framework.CommandRegistry, services: *Example
 }
 
 test "business services demo works through command context user_data" {
-    var app_context = try framework.AppContext.init(std.testing.allocator, std.Io.Threaded.global_single_threaded.*.io(), .{
+    var app_context = try zaibase.AppContext.init(std.testing.allocator, std.Io.Threaded.global_single_threaded.*.io(), .{
         .console_log_enabled = false,
     });
     defer app_context.deinit();
 
-    var effects_runtime = framework.EffectsRuntime.init(.{});
-    var registry = framework.ToolRegistry.init(std.testing.allocator);
+    var effects_runtime = zaibase.EffectsRuntime.init(.{});
+    var registry = zaibase.ToolRegistry.init(std.testing.allocator);
     defer registry.deinit();
-    try registry.register(framework.defineTool(framework.RepoHealthCheckTool));
+    try registry.register(zaibase.defineTool(zaibase.RepoHealthCheckTool));
 
-    const tooling_runtime = try framework.ToolingRuntime.init(.{
+    const tooling_runtime = try zaibase.ToolingRuntime.init(.{
         .allocator = std.testing.allocator,
         .app_context = &app_context,
         .effects = &effects_runtime,

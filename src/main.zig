@@ -1,5 +1,5 @@
 const std = @import("std");
-const framework = @import("framework");
+const framework = @import("zaibase");
 
 pub fn main() !void {
     _ = framework;

@@ -1,15 +1,15 @@
 const std = @import("std");
-const framework = @import("framework");
+const zaibase = @import("zaibase");
 
 pub fn main() !void {
-    var app_context = try framework.AppContext.init(std.heap.page_allocator, .{
+    var app_context = try zaibase.AppContext.init(std.heap.page_allocator, .{
         .console_log_enabled = true,
     });
     defer app_context.deinit();
 
     const Demo = struct {
-        fn call(ctx: *const framework.CommandContext) anyerror![]u8 {
-            var step = try framework.StepTrace.begin(
+        fn call(ctx: *const zaibase.CommandContext) anyerror![]u8 {
+            var step = try zaibase.StepTrace.begin(
                 ctx.allocator,
                 ctx.logger.logger,
                 "workflow/demo",
@@ -28,8 +28,8 @@ pub fn main() !void {
         .handler = Demo.call,
     });
 
-    var effects_runtime = framework.EffectsRuntime.init(.{});
-    var request_trace = try framework.observability.request_trace.begin(
+    var effects_runtime = zaibase.EffectsRuntime.init(.{});
+    var request_trace = try zaibase.observability.request_trace.begin(
         std.heap.page_allocator,
         app_context.logger,
         .cli,
@@ -40,7 +40,7 @@ pub fn main() !void {
     );
     defer request_trace.deinit();
 
-    var runner = framework.WorkflowRunner.init(
+    var runner = zaibase.WorkflowRunner.init(
         std.heap.page_allocator,
         app_context.makeDispatcher(),
         &effects_runtime,
@@ -49,7 +49,7 @@ pub fn main() !void {
         app_context.task_runner,
     );
 
-    const steps = [_]framework.WorkflowStep{
+    const steps = [_]zaibase.WorkflowStep{
         .{ .command = .{ .method = "demo.workflow.trace" } },
     };
     var result = try runner.run(.{
@@ -58,7 +58,7 @@ pub fn main() !void {
     });
     defer result.deinit(std.heap.page_allocator);
 
-    framework.observability.request_trace.complete(app_context.logger, &request_trace, 200, null);
+    zaibase.observability.request_trace.complete(app_context.logger, &request_trace, 200, null);
 }
 
 

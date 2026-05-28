@@ -1,24 +1,24 @@
 const std = @import("std");
-const framework = @import("framework");
+const zaibase = @import("zaibase");
 
 pub fn main() !void {
-    var app_context = try framework.AppContext.init(std.heap.page_allocator, .{
+    var app_context = try zaibase.AppContext.init(std.heap.page_allocator, .{
         .console_log_enabled = true,
     });
     defer app_context.deinit();
 
-    var effects_runtime = framework.EffectsRuntime.init(.{});
-    var tool_registry = framework.ToolRegistry.init(std.heap.page_allocator);
+    var effects_runtime = zaibase.EffectsRuntime.init(.{});
+    var tool_registry = zaibase.ToolRegistry.init(std.heap.page_allocator);
     defer tool_registry.deinit();
-    try tool_registry.register(framework.ScriptMarkdownFetchTool.definition());
+    try tool_registry.register(zaibase.ScriptMarkdownFetchTool.definition());
 
-    var host = framework.tooling.script_host.ScriptHost.init(
+    var host = zaibase.tooling.script_host.ScriptHost.init(
         std.heap.page_allocator,
         effects_runtime.process_runner,
         app_context.logger,
         app_context.eventBus(),
     );
-    var runner = framework.ToolRunner.init(
+    var runner = zaibase.ToolRunner.init(
         std.heap.page_allocator,
         &tool_registry,
         &effects_runtime,
@@ -27,12 +27,12 @@ pub fn main() !void {
         app_context.eventBus(),
     );
 
-    const fields = [_]framework.ValidationField{
+    const fields = [_]zaibase.ValidationField{
         .{ .key = "url", .value = .{ .string = "https://example.com/post" } },
     };
 
     var result = try runner.run(.{
-        .tool_id = framework.ScriptMarkdownFetchTool.tool_id,
+        .tool_id = zaibase.ScriptMarkdownFetchTool.tool_id,
         .request = .{
             .request_id = "script_markdown_demo_01",
             .source = .cli,

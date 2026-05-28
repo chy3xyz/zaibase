@@ -1,18 +1,18 @@
 const std = @import("std");
-const framework = @import("framework");
+const zaibase = @import("zaibase");
 
 pub fn main() !void {
-    var app_context = try framework.AppContext.init(std.heap.page_allocator, .{
+    var app_context = try zaibase.AppContext.init(std.heap.page_allocator, .{
         .console_log_enabled = true,
     });
     defer app_context.deinit();
 
-    var effects_runtime = framework.EffectsRuntime.init(.{});
-    var registry = framework.ToolRegistry.init(std.heap.page_allocator);
+    var effects_runtime = zaibase.EffectsRuntime.init(.{});
+    var registry = zaibase.ToolRegistry.init(std.heap.page_allocator);
     defer registry.deinit();
-    try registry.register(framework.defineTool(framework.RepoHealthCheckTool));
+    try registry.register(zaibase.defineTool(zaibase.RepoHealthCheckTool));
 
-    var runner = framework.ToolRunner.init(
+    var runner = zaibase.ToolRunner.init(
         std.heap.page_allocator,
         &registry,
         &effects_runtime,
@@ -21,11 +21,11 @@ pub fn main() !void {
         app_context.eventBus(),
     );
 
-    const fields = [_]framework.ValidationField{
+    const fields = [_]zaibase.ValidationField{
         .{ .key = "path", .value = .{ .string = "." } },
     };
     var result = try runner.run(.{
-        .tool_id = framework.RepoHealthCheckTool.tool_id,
+        .tool_id = zaibase.RepoHealthCheckTool.tool_id,
         .request = .{
             .request_id = "tooling_obs_demo",
             .source = .cli,

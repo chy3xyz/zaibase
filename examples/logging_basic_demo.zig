@@ -1,13 +1,13 @@
-const framework = @import("framework");
+const zaibase = @import("zaibase");
 
 pub fn main() !void {
-    var sink = framework.ConsoleSink.init(.debug, .compact);
-    var logger = framework.Logger.init(sink.asLogSink(), .debug);
+    var sink = zaibase.ConsoleSink.init(.debug, .compact);
+    var logger = zaibase.Logger.init(sink.asLogSink(), .debug);
     defer logger.deinit();
 
     logger.child("demo").info("basic log", &.{
-        framework.LogField.string("mode", "basic"),
-        framework.LogField.boolean("ok", true),
+        zaibase.LogField.string("mode", "basic"),
+        zaibase.LogField.boolean("ok", true),
     });
 }
 

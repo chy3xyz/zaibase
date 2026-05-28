@@ -1,12 +1,12 @@
 const std = @import("std");
-const framework = @import("../../root.zig");
+const zaibase = @import("../../root.zig");
 
 pub const ScriptMarkdownFetchTool = struct {
     pub const tool_id = "script.markdown_fetch";
     pub const tool_description = "Fetch a URL through an external script and return markdown-shaped JSON";
     pub const script_path = "examples/scripts/script_markdown_fetch.py";
     pub const script_args = &[_][]const u8{script_path};
-    pub const tool_params = &[_]framework.FieldDefinition{
+    pub const tool_params = &[_]zaibase.FieldDefinition{
         .{
             .key = "url",
             .required = true,
@@ -15,7 +15,7 @@ pub const ScriptMarkdownFetchTool = struct {
         },
     };
 
-    pub fn definition() framework.ToolDefinition {
+    pub fn definition() zaibase.ToolDefinition {
         return .{
             .id = tool_id,
             .description = tool_description,
@@ -31,23 +31,23 @@ pub const ScriptMarkdownFetchTool = struct {
 };
 
 test "script markdown fetch supports direct tool execution" {
-    var app_context = try framework.AppContext.init(std.testing.allocator, std.Io.Threaded.global_single_threaded.*.io(), .{
+    var app_context = try zaibase.AppContext.init(std.testing.allocator, std.Io.Threaded.global_single_threaded.*.io(), .{
         .console_log_enabled = false,
     });
     defer app_context.deinit();
 
-    var effects_runtime = framework.EffectsRuntime.init(.{});
-    var registry = framework.ToolRegistry.init(std.testing.allocator);
+    var effects_runtime = zaibase.EffectsRuntime.init(.{});
+    var registry = zaibase.ToolRegistry.init(std.testing.allocator);
     defer registry.deinit();
     try registry.register(ScriptMarkdownFetchTool.definition());
 
-    var host = framework.tooling.script_host.ScriptHost.init(
+    var host = zaibase.tooling.script_host.ScriptHost.init(
         std.testing.allocator,
         effects_runtime.process_runner,
         app_context.logger,
         app_context.eventBus(),
     );
-    var runner = framework.ToolRunner.init(
+    var runner = zaibase.ToolRunner.init(
         std.testing.allocator,
         &registry,
         &effects_runtime,
@@ -56,7 +56,7 @@ test "script markdown fetch supports direct tool execution" {
         app_context.eventBus(),
     );
 
-    const fields = [_]framework.ValidationField{
+    const fields = [_]zaibase.ValidationField{
         .{ .key = "url", .value = .{ .string = "https://example.com/post" } },
     };
     var result = try runner.run(.{
@@ -75,23 +75,23 @@ test "script markdown fetch supports direct tool execution" {
 }
 
 test "script markdown fetch supports command surface execution" {
-    var app_context = try framework.AppContext.init(std.testing.allocator, std.Io.Threaded.global_single_threaded.*.io(), .{
+    var app_context = try zaibase.AppContext.init(std.testing.allocator, std.Io.Threaded.global_single_threaded.*.io(), .{
         .console_log_enabled = false,
     });
     defer app_context.deinit();
 
-    var effects_runtime = framework.EffectsRuntime.init(.{});
-    var registry = framework.ToolRegistry.init(std.testing.allocator);
+    var effects_runtime = zaibase.EffectsRuntime.init(.{});
+    var registry = zaibase.ToolRegistry.init(std.testing.allocator);
     defer registry.deinit();
     try registry.register(ScriptMarkdownFetchTool.definition());
 
-    var host = framework.tooling.script_host.ScriptHost.init(
+    var host = zaibase.tooling.script_host.ScriptHost.init(
         std.testing.allocator,
         effects_runtime.process_runner,
         app_context.logger,
         app_context.eventBus(),
     );
-    var runner = framework.ToolRunner.init(
+    var runner = zaibase.ToolRunner.init(
         std.testing.allocator,
         &registry,
         &effects_runtime,
@@ -99,7 +99,7 @@ test "script markdown fetch supports command surface execution" {
         app_context.logger,
         app_context.eventBus(),
     );
-    var surface = framework.CommandSurface.init(
+    var surface = zaibase.CommandSurface.init(
         std.testing.allocator,
         &runner,
         &effects_runtime,
@@ -107,7 +107,7 @@ test "script markdown fetch supports command surface execution" {
     );
     try surface.registerAll(app_context.command_registry, &registry);
 
-    const fields = [_]framework.ValidationField{
+    const fields = [_]zaibase.ValidationField{
         .{ .key = "url", .value = .{ .string = "https://example.com/doc" } },
     };
     var dispatcher = app_context.makeDispatcher();

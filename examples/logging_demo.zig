@@ -1,5 +1,5 @@
 const std = @import("std");
-const framework = @import("framework");
+const zaibase = @import("zaibase");
 const ourclaw = @import("ourclaw");
 
 pub fn main() !void {
@@ -14,9 +14,9 @@ pub fn main() !void {
     app.framework_context.logger.child("zigf_api").info("🚀 Starting BF API - Zig BaseFramework", &.{});
     app.framework_context.logger.child("zigf_api").info("📋 Loading configuration...", &.{});
     app.framework_context.logger.child("zigf_api").child("config").info("Configuration loaded successfully", &.{
-        framework.LogField.string("environment", "development"),
-        framework.LogField.string("server", "0.0.0.0:3000"),
-        framework.LogField.string("logging_format", "pretty"),
+        zaibase.LogField.string("environment", "development"),
+        zaibase.LogField.string("server", "0.0.0.0:3000"),
+        zaibase.LogField.string("logging_format", "pretty"),
     });
 
     var response = try ourclaw.interfaces.http_adapter.handle(std.heap.page_allocator, app, .{

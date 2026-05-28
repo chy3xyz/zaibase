@@ -5,7 +5,7 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     // ── Library module ──────────────────────────────────────────────
-    const lib_mod = b.addModule("framework", .{
+    const lib_mod = b.addModule("zaibase", .{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
         .optimize = optimize,
@@ -13,14 +13,14 @@ pub fn build(b: *std.Build) void {
 
     // ── Executable ──────────────────────────────────────────────────
     const exe = b.addExecutable(.{
-        .name = "framework",
+        .name = "zaibase",
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/main.zig"),
             .target = target,
             .optimize = optimize,
         }),
     });
-    exe.root_module.addImport("framework", lib_mod);
+    exe.root_module.addImport("zaibase", lib_mod);
     b.installArtifact(exe);
 
     const run_cmd = b.addRunArtifact(exe);
@@ -29,7 +29,7 @@ pub fn build(b: *std.Build) void {
         run_cmd.addArgs(args);
     }
 
-    const run_step = b.step("run", "Run the framework executable");
+    const run_step = b.step("run", "Run the zaibase executable");
     run_step.dependOn(&run_cmd.step);
 
     // ── Tests ───────────────────────────────────────────────────────
@@ -40,10 +40,10 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         }),
     });
-    root_tests.root_module.addImport("framework", lib_mod);
+    root_tests.root_module.addImport("zaibase", lib_mod);
     const run_root_tests = b.addRunArtifact(root_tests);
 
-    const test_step = b.step("test", "Run framework unit tests");
+    const test_step = b.step("test", "Run zaibase unit tests");
     test_step.dependOn(&run_root_tests.step);
 
     // ── Format check ────────────────────────────────────────────────

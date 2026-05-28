@@ -1,10 +1,10 @@
 const std = @import("std");
-const framework = @import("../../root.zig");
+const zaibase = @import("../../root.zig");
 
 pub const RepoHealthCheckTool = struct {
     pub const tool_id = "repo.health_check";
     pub const tool_description = "Inspect a repository-like directory and report basic health signals";
-    pub const tool_params = &[_]framework.FieldDefinition{
+    pub const tool_params = &[_]zaibase.FieldDefinition{
         .{
             .key = "path",
             .required = true,
@@ -13,7 +13,7 @@ pub const RepoHealthCheckTool = struct {
         },
     };
 
-    pub fn execute(ctx: *const framework.ToolContext) ![]u8 {
+    pub fn execute(ctx: *const zaibase.ToolContext) ![]u8 {
         const path = ctx.param("path").?.value.string;
         const entries = try ctx.effects.file_system.listDir(ctx.allocator, path);
         defer {
@@ -43,14 +43,14 @@ pub const RepoHealthCheckTool = struct {
     }
 };
 
-fn hasEntry(entries: []const framework.FsEntry, name: []const u8) bool {
+fn hasEntry(entries: []const zaibase.FsEntry, name: []const u8) bool {
     for (entries) |entry| {
         if (std.mem.eql(u8, entry.name, name)) return true;
     }
     return false;
 }
 
-fn hasDirectory(entries: []const framework.FsEntry, name: []const u8) bool {
+fn hasDirectory(entries: []const zaibase.FsEntry, name: []const u8) bool {
     for (entries) |entry| {
         if (std.mem.eql(u8, entry.name, name) and entry.kind == .directory) return true;
     }
@@ -58,16 +58,16 @@ fn hasDirectory(entries: []const framework.FsEntry, name: []const u8) bool {
 }
 
 test "repo health check supports direct tool execution" {
-    const definition = framework.defineTool(RepoHealthCheckTool);
+    const definition = zaibase.defineTool(RepoHealthCheckTool);
 
-    var sink = framework.MemorySink.init(std.testing.allocator, 1);
+    var sink = zaibase.MemorySink.init(std.testing.allocator, 1);
     defer sink.deinit();
-    var logger = framework.Logger.init(sink.asLogSink(), .silent);
+    var logger = zaibase.Logger.init(sink.asLogSink(), .silent);
     defer logger.deinit();
 
-    var bus = framework.MemoryEventBus.init(std.testing.allocator);
+    var bus = zaibase.MemoryEventBus.init(std.testing.allocator);
     defer bus.deinit();
-    var effects_runtime = framework.EffectsRuntime.init(.{});
+    var effects_runtime = zaibase.EffectsRuntime.init(.{});
 
     var tmp_dir = std.testing.tmpDir(.{});
     defer tmp_dir.cleanup();
@@ -90,10 +90,10 @@ test "repo health check supports direct tool execution" {
     defer std.testing.allocator.free(build_path);
     try effects_runtime.file_system.writeFile(build_path, "pub fn build() void {}");
 
-    const params = [_]framework.ValidationField{
+    const params = [_]zaibase.ValidationField{
         .{ .key = "path", .value = .{ .string = root_path } },
     };
-    const ctx = framework.ToolContext{
+    const ctx = zaibase.ToolContext{
         .allocator = std.testing.allocator,
         .request = .{
             .request_id = "repo_health_direct_01",
@@ -114,17 +114,17 @@ test "repo health check supports direct tool execution" {
 }
 
 test "repo health check supports command surface execution" {
-    var app_context = try framework.AppContext.init(std.testing.allocator, std.Io.Threaded.global_single_threaded.*.io(), .{
+    var app_context = try zaibase.AppContext.init(std.testing.allocator, std.Io.Threaded.global_single_threaded.*.io(), .{
         .console_log_enabled = false,
     });
     defer app_context.deinit();
 
-    var effects_runtime = framework.EffectsRuntime.init(.{});
-    var registry = framework.ToolRegistry.init(std.testing.allocator);
+    var effects_runtime = zaibase.EffectsRuntime.init(.{});
+    var registry = zaibase.ToolRegistry.init(std.testing.allocator);
     defer registry.deinit();
-    try registry.register(framework.defineTool(RepoHealthCheckTool));
+    try registry.register(zaibase.defineTool(RepoHealthCheckTool));
 
-    var runner = framework.ToolRunner.init(
+    var runner = zaibase.ToolRunner.init(
         std.testing.allocator,
         &registry,
         &effects_runtime,
@@ -132,7 +132,7 @@ test "repo health check supports command surface execution" {
         app_context.logger,
         app_context.eventBus(),
     );
-    var surface = framework.CommandSurface.init(
+    var surface = zaibase.CommandSurface.init(
         std.testing.allocator,
         &runner,
         &effects_runtime,
@@ -153,7 +153,7 @@ test "repo health check supports command surface execution" {
     defer std.testing.allocator.free(build_path);
     try effects_runtime.file_system.writeFile(build_path, "pub fn build() void {}");
 
-    const fields = [_]framework.ValidationField{
+    const fields = [_]zaibase.ValidationField{
         .{ .key = "path", .value = .{ .string = root_path } },
     };
 

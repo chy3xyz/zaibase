@@ -1,8 +1,8 @@
 const std = @import("std");
-const framework = @import("framework");
+const zaibase = @import("zaibase");
 
 pub fn main() !void {
-    var sink = try framework.TraceTextFileSink.init(
+    var sink = try zaibase.TraceTextFileSink.init(
         std.heap.page_allocator,
         "logs/summary-trace-demo.log",
         1024 * 1024,
@@ -10,10 +10,10 @@ pub fn main() !void {
     );
     defer sink.deinit();
 
-    var logger = framework.Logger.init(sink.asLogSink(), .debug);
+    var logger = zaibase.Logger.init(sink.asLogSink(), .debug);
     defer logger.deinit();
 
-    var request_trace = try framework.observability.request_trace.begin(
+    var request_trace = try zaibase.observability.request_trace.begin(
         std.heap.page_allocator,
         &logger,
         .cli,
@@ -24,7 +24,7 @@ pub fn main() !void {
     );
     defer request_trace.deinit();
 
-    var controller_trace = try framework.MethodTrace.begin(
+    var controller_trace = try zaibase.MethodTrace.begin(
         std.heap.page_allocator,
         &logger,
         "Controller.Auth.Login",
@@ -33,7 +33,7 @@ pub fn main() !void {
     );
     defer controller_trace.deinit();
 
-    var controller_summary = try framework.SummaryTrace.begin(
+    var controller_summary = try zaibase.SummaryTrace.begin(
         std.heap.page_allocator,
         &logger,
         "Controller.Auth.Login",
@@ -41,7 +41,7 @@ pub fn main() !void {
     );
     defer controller_summary.deinit();
 
-    var repository_trace = try framework.MethodTrace.begin(
+    var repository_trace = try zaibase.MethodTrace.begin(
         std.heap.page_allocator,
         &logger,
         "Repository.UserRepository.GetByLoginIdAsync",
@@ -51,7 +51,7 @@ pub fn main() !void {
     defer repository_trace.deinit();
     repository_trace.finishSuccess("SYS_UserInfo", true);
 
-    var repository_summary = try framework.SummaryTrace.begin(
+    var repository_summary = try zaibase.SummaryTrace.begin(
         std.heap.page_allocator,
         &logger,
         "Repository.UserRepository.GetByLoginIdAsync",
@@ -62,7 +62,7 @@ pub fn main() !void {
 
     controller_trace.finishSuccess("Ok(200)", false);
     controller_summary.finishSuccess();
-    framework.observability.request_trace.complete(&logger, &request_trace, 200, null);
+    zaibase.observability.request_trace.complete(&logger, &request_trace, 200, null);
 }
 
 

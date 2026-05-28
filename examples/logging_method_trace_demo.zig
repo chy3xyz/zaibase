@@ -1,13 +1,13 @@
 const std = @import("std");
-const framework = @import("framework");
+const zaibase = @import("zaibase");
 
 pub fn main() !void {
-    var console_sink = framework.ConsoleSink.init(.trace, .pretty);
-    var logger = framework.Logger.init(console_sink.asLogSink(), .trace);
+    var console_sink = zaibase.ConsoleSink.init(.trace, .pretty);
+    var logger = zaibase.Logger.init(console_sink.asLogSink(), .trace);
 
     logger.child("zigf_api").info("🚀 Starting BF API - Zig BaseFramework", &.{});
 
-    var request_trace = try framework.observability.request_trace.begin(
+    var request_trace = try zaibase.observability.request_trace.begin(
         std.heap.page_allocator,
         &logger,
         .http,
@@ -18,7 +18,7 @@ pub fn main() !void {
     );
     defer request_trace.deinit();
 
-    var controller = try framework.observability.MethodTrace.begin(
+    var controller = try zaibase.observability.MethodTrace.begin(
         std.heap.page_allocator,
         &logger,
         "Controller.Auth.Login",
@@ -27,7 +27,7 @@ pub fn main() !void {
     );
     defer controller.deinit();
 
-    var repository_exists = try framework.observability.MethodTrace.begin(
+    var repository_exists = try zaibase.observability.MethodTrace.begin(
         std.heap.page_allocator,
         &logger,
         "Repository.UserRepository.ExistsAndEnabledAsync",
@@ -37,7 +37,7 @@ pub fn main() !void {
     defer repository_exists.deinit();
     repository_exists.finishSuccess("True", true);
 
-    var repository_get = try framework.observability.MethodTrace.begin(
+    var repository_get = try zaibase.observability.MethodTrace.begin(
         std.heap.page_allocator,
         &logger,
         "Repository.UserRepository.GetByLoginIdAsync",
@@ -48,7 +48,7 @@ pub fn main() !void {
     repository_get.finishSuccess("SYS_UserInfo", true);
 
     controller.finishSuccess("Ok(200)", false);
-    framework.observability.request_trace.complete(&logger, &request_trace, 200, null);
+    zaibase.observability.request_trace.complete(&logger, &request_trace, 200, null);
 }
 
 

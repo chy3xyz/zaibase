@@ -1,6 +1,6 @@
 # Logging Module
 
-A zero-dependency structured logging subsystem built into the framework. Replaces the external `zig-logging` package with a native implementation that integrates with framework conventions (observability, effects, error model).
+A zero-dependency structured logging subsystem built into zaibase. Replaces the external `zig-logging` package with a native implementation that integrates with zaibase conventions (observability, effects, error model).
 
 ## Overview
 
@@ -246,7 +246,7 @@ const multi = Multi.init(&.{ sink1.asLogSink(), sink2.asLogSink() });
 
 ## Observability Integration
 
-The framework's `observability` module (request_trace, method_trace, step_trace, summary_trace) uses the logging module as its output layer. Each trace type emits structured `LogRecord`s with a specific `LogRecordKind`:
+Zaibase's `observability` module (request_trace, method_trace, step_trace, summary_trace) uses the logging module as its output layer. Each trace type emits structured `LogRecord`s with a specific `LogRecordKind`:
 
 | Trace Type      | `LogRecordKind` | Sink Label          |
 |-----------------|-----------------|---------------------|

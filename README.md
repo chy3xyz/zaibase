@@ -1,6 +1,6 @@
-# framework
+# zaibase
 
-A reusable Zig application framework. Provides shared foundational capabilities for `ourclaw` and other Zig applications.
+zaibase — Zig AI development base code. Provides shared foundational capabilities for `ourclaw` and other Zig applications.
 
 > **Prerequisite:** use Zig 0.17.0 for build and tests.
 
