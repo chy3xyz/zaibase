@@ -9,46 +9,53 @@ zaibase — Zig AI development base code. Provides shared foundational capabilit
 | Module | Area | Status |
 |--------|------|--------|
 | `src/core/logging/` | Structured logging (zero external deps) | ✅ Production-ready |
+| `src/memory/` | Agent episodic memory store | ✅ Active |
+| `src/evolution/` | Self-evolution — experience recording + learner | ✅ Active |
+| `src/servicekit/` | Service vtable interface + lifecycle manager | ✅ Active |
 | `src/core/validation/` | Config & request validation | ✅ Active |
 | `src/observability/` | Traces, metrics, observers | ✅ Active |
-| `src/contracts/` | Shared error model, envelopes | ✅ Active |
+| `src/contracts/` | Shared error model, envelopes, capability manifests | ✅ Active |
 | `src/config/` | Config store, write pipeline | ✅ Active |
 | `src/runtime/` | AppContext, event bus, task runner | ✅ Active |
 | `src/app/` | Command dispatch, CLI adapters | ✅ Active |
-| `src/effects/` | File I/O, process runner, clock | ✅ Active |
+| `src/effects/` | File I/O, process runner, clock, HTTP client | ✅ Active |
 | `src/tooling/` | MCP, script host, tool registry | ✅ Active |
 | `src/workflow/` | Workflow steps & state machine | ⚠ Evolving |
-| `src/servicekit/` | Service framework | ⚠ Evolving |
+| `src/agentkit/` | Provider definitions | ⚠ Evolving |
 
 ## Recent Changes
 
-### Dependency Cleanup
+### Zero External Dependencies
 
-- **Removed external `zig-logging` dependency** — replaced with a native logging module (`src/core/logging/`)
-- **Removed `zig-release` dependency** — no longer required
-- **Zero external runtime dependencies** — the framework now builds entirely from Zig 0.17 standard library
+- **Removed external `zig-logging`** — replaced with native 1,173-line logging module
+- **Removed `zig-release`** — no longer required
+- `build.zig.zon` has `.dependencies = .{}` — entire framework builds from Zig 0.17 stdlib only
 
 ### Zig 0.17 Migration
 
 - Updated `build.zig.zon` to `minimum_zig_version = "0.17.0"`
 - All I/O uses `std.Io` APIs (Io.File, Io.Dir, Io.Timestamp)
-- File sinks require an `std.Io` parameter
+- File sinks and effects require an `std.Io` parameter
 
-## Logging Module
+### Agent Memory & Evolution
 
-A self-contained structured logging subsystem at `src/core/logging/`. See [docs/architecture/logging-module.md](docs/architecture/logging-module.md).
+- **`src/memory/`** — `MemoryStore` vtable interface + `EpisodicMemory` ring-buffer implementation with tag/timestamp queries
+- **`src/evolution/`** — `Experience` recording, `NativeExperienceStore`, `SimpleLearner` that extracts success-rate insights from past actions
 
-### Quick Start
+### Service Kit
+
+- **`src/servicekit/`** — `Service` vtable interface (start/stop/health), `NativeEchoService`, `ServiceManager` with lifecycle and aggregate health reporting
+
+## Quick Start
 
 ```zig
-const framework = @import("framework");
+const zaibase = @import("zaibase");
 
 // Logger with console output
-var console_sink = framework.ConsoleSink.init(.trace, .pretty);
-const io = std.Io.Threaded.global_single_threaded.*.io();
-var logger = framework.Logger.init(console_sink.asLogSink(), .info);
+var sink = zaibase.ConsoleSink.init(.trace, .pretty);
+var logger = zaibase.Logger.init(sink.asLogSink(), .info);
 
-logger.info("hello framework", &.{});
+logger.info("hello zaibase", &.{});
 
 // Scoped child logger
 var child = logger.child("my_subsystem");
@@ -56,25 +63,14 @@ child.warn("something worth noting", &.{});
 
 // With structured fields
 logger.info("request completed", &.{
-    framework.LogField.string("method", "GET"),
-    framework.LogField.uint("duration_ms", 42),
+    zaibase.LogField.string("method", "GET"),
+    zaibase.LogField.uint("duration_ms", 42),
 });
 ```
 
-### Available Sinks
-
-| Sink | File | Description |
-|------|------|-------------|
-| Console | `sinks/console.zig` | stderr with pretty/compact format |
-| Memory | `sinks/memory.zig` | Ring buffer for testing |
-| JsonlFile | `sinks/jsonl_file.zig` | Newline-delimited JSON to file |
-| TraceTextFile | `sinks/trace_text_file.zig` | Human-readable text file |
-| RotatingFile | `sinks/rotating_file.zig` | JSONL with size-based rotation |
-| Multi | `sinks/multi.zig` | Fan-out to multiple sinks |
-
 ## Documentation
 
-- [Logging Module](docs/architecture/logging-module.md) — Architecture & API reference (English)
+- [Logging, Memory & Evolution Reference](docs/architecture/logging-module.md) — English API docs covering all 3 modules
 - [docs/README.md](docs/README.md) — Full document index
 - `examples/` — Runnable demo programs
 
@@ -82,7 +78,7 @@ logger.info("request completed", &.{
 
 ```bash
 zig build          # compile the framework
-zig build test     # run all tests (166/186 pass, see below)
+zig build test     # run all tests
 ```
 
 ### Known Test Failures
@@ -93,15 +89,18 @@ zig build test     # run all tests (166/186 pass, see below)
 
 ```
 src/
-├── core/         # Core types: logging, validation, error, security
-├── config/       # Configuration store & pipeline
-├── effects/      # Side-effect abstractions: file I/O, process, clock, HTTP
-├── observability/# Log observers, metrics, traces
-├── runtime/      # AppContext, event bus, task runner
-├── app/          # Command dispatch, CLI
-├── contracts/    # Shared envelopes, capability manifests
-├── tooling/      # MCP client/server, script host, tool registry
-├── servicekit/   # Service abstraction
-├── workflow/     # Workflow steps & runner
-└── root.zig      # Public module exports
+├── core/          # Core types: logging, validation, error, security
+├── memory/        # Agent memory store (MemoryStore vtable + EpisodicMemory)
+├── evolution/     # Self-evolution (Experience + Learner/Insight)
+├── servicekit/    # Service vtable interface + ServiceManager
+├── config/        # Configuration store & write pipeline
+├── effects/       # Side-effect abstractions: file I/O, process, clock, HTTP
+├── observability/ # Log observers, metrics, traces, request/step/summary traces
+├── runtime/       # AppContext DI container, event bus, task runner
+├── app/           # Command dispatch, CLI adapters
+├── contracts/     # Shared envelopes, capability manifests
+├── tooling/       # MCP client/server, script host, tool registry & runner
+├── workflow/      # Workflow steps & state machine
+├── agentkit/      # Provider definitions
+└── root.zig       # Public module exports
 ```
