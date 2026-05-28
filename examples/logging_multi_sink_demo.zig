@@ -6,10 +6,8 @@ pub fn main() !void {
     defer memory.deinit();
 
     var console = zaibase.ConsoleSink.init(.trace, .pretty);
-    var multi = try zaibase.MultiSink.init(std.heap.page_allocator, &.{
-        memory.asLogSink(),
-        console.asLogSink(),
-    });
+    var sink_list = [_]zaibase.LogSink{ memory.asLogSink(), console.asLogSink() };
+    var multi = try zaibase.MultiSink.init(std.heap.page_allocator, &sink_list);
     defer multi.deinit();
 
     var logger = zaibase.Logger.init(multi.asLogSink(), .trace);
@@ -19,5 +17,3 @@ pub fn main() !void {
         zaibase.LogField.string("sink_count", "2"),
     });
 }
-
-
