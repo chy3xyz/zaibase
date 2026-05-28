@@ -3,7 +3,7 @@
 const std = @import("std");
 
 pub const PACKAGE_NAME = "zaibase";
-pub const PACKAGE_VERSION = "0.1.0";
+pub const PACKAGE_VERSION = "0.3.0";
 
 pub const core = @import("core/root.zig");
 pub const contracts = @import("contracts/root.zig");
