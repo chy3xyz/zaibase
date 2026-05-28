@@ -1,11 +1,32 @@
+# Build cache
+.zig-cache/
+zig-out/
+.zig-cache-global
+
+# Agent state
+.deepseek/
+
+# External package artifacts
+zig-pkg/
+
+# Logs
 out.log
 err.log
 out2.log
 err2.log
 zig-test.log
 *-tmp.log
+
+# Scratch / temp
 tmp.zig
-.zig-cache/
-zig-out/
+test_*.zig
+tmp_*
+
+# Platform
 .DS_Store
-.zig-cache-global
+
+# Editor
+tags
+*.swp
+*.swo
+*~
